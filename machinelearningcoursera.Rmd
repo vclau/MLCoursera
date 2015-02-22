@@ -1,0 +1,102 @@
+---
+output: html_document
+---
+Weight Lifting Exercise Data Analysis 
+========================================================
+
+Summary
+========================================================
+
+"One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways" 
+Through data analysis we will try to determine if the users performed the exercise correctly 
+
+
+Data
+========================================================
+
+We are using the data provided by coursera of the study by Groupware@LES
+
+Training Data - [CSV](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+Test Data - [CVS](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+```{r load data, echo=FALSE, message=FALSE, warning=FALSE, error=FALSE}
+setwd('~/Dropbox/Coursera - R/Practical Machine Learning/Proy')
+library(caret); library(kernlab); library (ISLR);
+#Load CSV file with data 
+trainingD<-read.csv("pml-training.csv" ,na.strings=c("","NA"), header=T)
+```
+
+
+Data Processing
+========================================================
+The first thing that we need to do is to remove columns with NA's in it, and the first 7 columns that have identifiers to leave the columns we will be working with. 
+While it might hinder the accuracy of the model I'm taking a 99.9% confident sample of the data,this will allow my 4GB of RAM process the data in less time (I tried it the first time with 19K observations and 60 columns, after a couple of hours I found my model was overfitted) . 
+I'm setting a seed of the sample I'm taking to allow reproducibility of the model
+
+I'm setting a 70% training & 30% testing data sample split. 
+```{r data proc , echo=T, message=FALSE, warning=FALSE, error=FALSE}
+#Remove NA's
+trainingD<-trainingD[ , apply(trainingD, 2, function(x) !any(is.na(x)))]
+#Remove identifier columns 
+trainingD <- trainingD[,-c(1:7)]
+table(trainingD$classe)
+
+## GET SAMPLE 
+size<-as.integer((as.character(nrow(trainingD))))
+
+sample.size = function(c.lev, margin=.5,
+                       c.interval=.05, population) {
+  z.val = qnorm(.5+c.lev/200)
+  ss = (z.val^2 * margin * (1-margin))/c.interval^2
+  p.ss = round((ss/(1 + ((ss-1)/population))), digits=0)
+  METHOD = paste("Recommended sample size for a population of ",
+                 population, " at a ", c.lev,
+                 "% confidence level", sep = "")
+  structure(list(Population = population,
+                 "Confidence level" = c.lev,
+                 "Margin of error" = c.interval,
+                 "Response distribution" = margin,
+                 "Recommended sample size" = p.ss,
+                 method = METHOD),
+            class = "power.htest")
+}
+
+sampleSize<-sample.size(99.9, , , size)
+
+
+ss<-as.integer(sampleSize[5])
+
+set.seed(1)
+trainS<-trainingD[sample (nrow(trainingD), ss),]
+table(trainS$classe)
+
+inTrain<-createDataPartition(y=trainS$classe, p=.7, list=F)
+training<-trainS[inTrain,]
+testing<-trainS[-inTrain,]
+dim(training); dim(testing)
+```
+
+Model Building & testing
+========================================================
+I'm using a Stochastic Gradient Boosting model with the sample that resulted in a 80% accuracy and 20% error rate. 
+While the model is not perfect it does provide a good rate of accuracy 
+```{r model, echo=T, message=FALSE, warning=FALSE, error=FALSE}
+modFit<-train(classe~.,method="gbm", data=training, verbose=F)
+print(modFit)
+
+pred<-predict(modFit,testing); 
+qplot(pred, classe, data=testing)
+table(pred, testing$classe)
+
+testingD<-read.csv("~/Dropbox/Coursera - R/Practical Machine Learning/Proy/pml-testing.csv" ,na.strings=c("","NA"), header=T)
+testingD<-testingD[ , apply(testingD, 2, function(x) !any(is.na(x)))]
+finalTesting <- testingD[,-c(1:7)]
+finalPrediction<-predict(modFit,finalTesting); 
+print(finalPrediction)
+```
+```
+
+
+Final Test
+========================================================
+As expected I got 18 out of 20 correct results in the final test. 
