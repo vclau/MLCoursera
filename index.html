@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Mlcoursera by vclau</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Mlcoursera</h1>
+        <p></p>
+
+        <p class="view"><a href="https://github.com/vclau/MLCoursera">View the Project on GitHub <small>vclau/MLCoursera</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/vclau/MLCoursera/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/vclau/MLCoursera/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/vclau/MLCoursera">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <hr>
+
+<h2>
+<a id="output-html_document" class="anchor" href="#output-html_document" aria-hidden="true"><span class="octicon octicon-link"></span></a>output: html_document</h2>
+
+<h1>
+<a id="weight-lifting-exercise-data-analysis-" class="anchor" href="#weight-lifting-exercise-data-analysis-" aria-hidden="true"><span class="octicon octicon-link"></span></a>Weight Lifting Exercise Data Analysis </h1>
+
+<h1>
+<a id="summary" class="anchor" href="#summary" aria-hidden="true"><span class="octicon octicon-link"></span></a>Summary</h1>
+
+<p>"One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways" 
+Through data analysis we will try to determine if the users performed the exercise correctly </p>
+
+<h1>
+<a id="data" class="anchor" href="#data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Data</h1>
+
+<p>We are using the data provided by coursera of the study by Groupware@LES</p>
+
+<p>Training Data - <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">CSV</a>
+Test Data - <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">CVS</a></p>
+
+<div class="highlight highlight-r"><pre>setwd(<span class="pl-s1"><span class="pl-pds">'</span>~/Dropbox/Coursera - R/Practical Machine Learning/Proy<span class="pl-pds">'</span></span>)
+library(<span class="pl-vo">caret</span>); library(<span class="pl-vo">kernlab</span>); library (<span class="pl-vo">ISLR</span>);
+<span class="pl-c">#Load CSV file with data </span>
+<span class="pl-vo">trainingD</span><span class="pl-k">&lt;-</span>read.csv(<span class="pl-s1"><span class="pl-pds">"</span>pml-training.csv<span class="pl-pds">"</span></span> ,<span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s1"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>,<span class="pl-s1"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>), <span class="pl-v">header</span><span class="pl-k">=</span><span class="pl-c1">T</span>)</pre></div>
+
+<h1>
+<a id="data-processing" class="anchor" href="#data-processing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Data Processing</h1>
+
+<p>The first thing that we need to do is to remove columns with NA's in it, and the first 7 columns that have identifiers to leave the columns we will be working with. 
+While it might hinder the accuracy of the model I'm taking a 99.9% confident sample of the data,this will allow my 4GB of RAM process the data in less time (I tried it the first time with 19K observations and 60 columns, after a couple of hours I found my model was overfitted) . 
+I'm setting a seed of the sample I'm taking to allow reproducibility of the model</p>
+
+<p>I'm setting a 70% training &amp; 30% testing data sample split. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-c">#Remove NA's</span>
+<span class="pl-vo">trainingD</span><span class="pl-k">&lt;-</span><span class="pl-vo">trainingD</span>[ , apply(<span class="pl-vo">trainingD</span>, <span class="pl-c1">2</span>, <span class="pl-k">function</span>(<span class="pl-vo">x</span>) <span class="pl-k">!</span>any(is.na(<span class="pl-vo">x</span>)))]
+<span class="pl-c">#Remove identifier columns </span>
+<span class="pl-vo">trainingD</span> <span class="pl-k">&lt;-</span> <span class="pl-vo">trainingD</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">7</span>)]
+table(<span class="pl-vo">trainingD</span><span class="pl-k">$</span><span class="pl-vo">classe</span>)
+
+<span class="pl-c">## GET SAMPLE </span>
+<span class="pl-vo">size</span><span class="pl-k">&lt;-</span>as.integer((as.character(nrow(<span class="pl-vo">trainingD</span>))))
+
+<span class="pl-v">sample.size</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-vo">c.lev</span>, <span class="pl-v">margin</span><span class="pl-k">=</span>.<span class="pl-c1">5</span>,
+                       <span class="pl-v">c.interval</span><span class="pl-k">=</span>.<span class="pl-c1">05</span>, <span class="pl-vo">population</span>) {
+  <span class="pl-v">z.val</span> <span class="pl-k">=</span> qnorm(.<span class="pl-c1">5</span><span class="pl-k">+</span><span class="pl-vo">c.lev</span><span class="pl-k">/</span><span class="pl-c1">200</span>)
+  <span class="pl-v">ss</span> <span class="pl-k">=</span> (<span class="pl-vo">z.val</span><span class="pl-k">^</span><span class="pl-c1">2</span> <span class="pl-k">*</span> <span class="pl-vo">margin</span> <span class="pl-k">*</span> (<span class="pl-c1">1</span><span class="pl-k">-</span><span class="pl-vo">margin</span>))<span class="pl-k">/</span><span class="pl-vo">c.interval</span><span class="pl-k">^</span><span class="pl-c1">2</span>
+  <span class="pl-v">p.ss</span> <span class="pl-k">=</span> round((<span class="pl-vo">ss</span><span class="pl-k">/</span>(<span class="pl-c1">1</span> <span class="pl-k">+</span> ((<span class="pl-vo">ss</span><span class="pl-k">-</span><span class="pl-c1">1</span>)<span class="pl-k">/</span><span class="pl-vo">population</span>))), <span class="pl-v">digits</span><span class="pl-k">=</span><span class="pl-c1">0</span>)
+  <span class="pl-v">METHOD</span> <span class="pl-k">=</span> paste(<span class="pl-s1"><span class="pl-pds">"</span>Recommended sample size for a population of <span class="pl-pds">"</span></span>,
+                 <span class="pl-vo">population</span>, <span class="pl-s1"><span class="pl-pds">"</span> at a <span class="pl-pds">"</span></span>, <span class="pl-vo">c.lev</span>,
+                 <span class="pl-s1"><span class="pl-pds">"</span>% confidence level<span class="pl-pds">"</span></span>, <span class="pl-v">sep</span> <span class="pl-k">=</span> <span class="pl-s1"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>)
+  structure(<span class="pl-st">list</span>(<span class="pl-v">Population</span> <span class="pl-k">=</span> <span class="pl-vo">population</span>,
+                 <span class="pl-s1"><span class="pl-pds">"</span>Confidence level<span class="pl-pds">"</span></span> <span class="pl-k">=</span> <span class="pl-vo">c.lev</span>,
+                 <span class="pl-s1"><span class="pl-pds">"</span>Margin of error<span class="pl-pds">"</span></span> <span class="pl-k">=</span> <span class="pl-vo">c.interval</span>,
+                 <span class="pl-s1"><span class="pl-pds">"</span>Response distribution<span class="pl-pds">"</span></span> <span class="pl-k">=</span> <span class="pl-vo">margin</span>,
+                 <span class="pl-s1"><span class="pl-pds">"</span>Recommended sample size<span class="pl-pds">"</span></span> <span class="pl-k">=</span> <span class="pl-vo">p.ss</span>,
+                 <span class="pl-v">method</span> <span class="pl-k">=</span> <span class="pl-vo">METHOD</span>),
+            <span class="pl-v">class</span> <span class="pl-k">=</span> <span class="pl-s1"><span class="pl-pds">"</span>power.htest<span class="pl-pds">"</span></span>)
+}
+
+<span class="pl-vo">sampleSize</span><span class="pl-k">&lt;-</span>sample.size(<span class="pl-c1">99.9</span>, , , <span class="pl-vo">size</span>)
+
+
+<span class="pl-vo">ss</span><span class="pl-k">&lt;-</span>as.integer(<span class="pl-vo">sampleSize</span>[<span class="pl-c1">5</span>])
+
+set.seed(<span class="pl-c1">1</span>)
+<span class="pl-vo">trainS</span><span class="pl-k">&lt;-</span><span class="pl-vo">trainingD</span>[sample (nrow(<span class="pl-vo">trainingD</span>), <span class="pl-vo">ss</span>),]
+table(<span class="pl-vo">trainS</span><span class="pl-k">$</span><span class="pl-vo">classe</span>)
+
+<span class="pl-vo">inTrain</span><span class="pl-k">&lt;-</span>createDataPartition(<span class="pl-v">y</span><span class="pl-k">=</span><span class="pl-vo">trainS</span><span class="pl-k">$</span><span class="pl-vo">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span>.<span class="pl-c1">7</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">F</span>)
+<span class="pl-vo">training</span><span class="pl-k">&lt;-</span><span class="pl-vo">trainS</span>[<span class="pl-vo">inTrain</span>,]
+<span class="pl-vo">testing</span><span class="pl-k">&lt;-</span><span class="pl-vo">trainS</span>[<span class="pl-k">-</span><span class="pl-vo">inTrain</span>,]
+dim(<span class="pl-vo">training</span>); dim(<span class="pl-vo">testing</span>)</pre></div>
+
+<h1>
+<a id="model-building--testing" class="anchor" href="#model-building--testing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Model Building &amp; testing</h1>
+
+<p>I'm using a Stochastic Gradient Boosting model with the sample that resulted in a 80% accuracy and 20% error rate. 
+While the model is not perfect it does provide a good rate of accuracy </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-vo">modFit</span><span class="pl-k">&lt;-</span>train(<span class="pl-vo">classe</span><span class="pl-k">~</span>.,<span class="pl-v">method</span><span class="pl-k">=</span><span class="pl-s1"><span class="pl-pds">"</span>gbm<span class="pl-pds">"</span></span>, <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-vo">training</span>, <span class="pl-v">verbose</span><span class="pl-k">=</span><span class="pl-c1">F</span>)
+print(<span class="pl-vo">modFit</span>)
+
+<span class="pl-vo">pred</span><span class="pl-k">&lt;-</span>predict(<span class="pl-vo">modFit</span>,<span class="pl-vo">testing</span>); 
+qplot(<span class="pl-vo">pred</span>, <span class="pl-vo">classe</span>, <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-vo">testing</span>)
+table(<span class="pl-vo">pred</span>, <span class="pl-vo">testing</span><span class="pl-k">$</span><span class="pl-vo">classe</span>)
+
+<span class="pl-vo">testingD</span><span class="pl-k">&lt;-</span>read.csv(<span class="pl-s1"><span class="pl-pds">"</span>~/Dropbox/Coursera - R/Practical Machine Learning/Proy/pml-testing.csv<span class="pl-pds">"</span></span> ,<span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s1"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>,<span class="pl-s1"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>), <span class="pl-v">header</span><span class="pl-k">=</span><span class="pl-c1">T</span>)
+<span class="pl-vo">testingD</span><span class="pl-k">&lt;-</span><span class="pl-vo">testingD</span>[ , apply(<span class="pl-vo">testingD</span>, <span class="pl-c1">2</span>, <span class="pl-k">function</span>(<span class="pl-vo">x</span>) <span class="pl-k">!</span>any(is.na(<span class="pl-vo">x</span>)))]
+<span class="pl-vo">finalTesting</span> <span class="pl-k">&lt;-</span> <span class="pl-vo">testingD</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">7</span>)]
+<span class="pl-vo">finalPrediction</span><span class="pl-k">&lt;-</span>predict(<span class="pl-vo">modFit</span>,<span class="pl-vo">finalTesting</span>); 
+print(<span class="pl-vo">finalPrediction</span>)</pre></div>
+
+<pre><code>
+
+Final Test
+========================================================
+As expected I got 18 out of 20 correct results in the final test. 
+
+</code></pre>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/vclau">vclau</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
